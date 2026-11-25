@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloud-pet.local/schemas/asset-manifest-v1.json",
+  "title": "Cloud Pet asset overrides v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "revision", "baseUrl", "breeds", "coats", "backgrounds", "hand"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "revision": { "type": "string", "minLength": 1 },
+    "baseUrl": { "type": "string", "pattern": "^(https://|/)", "minLength": 1 },
+    "breeds": {
+      "type": "object",
+      "propertyNames": { "enum": ["domestic-shorthair", "british-shorthair", "ragdoll", "maine-coon", "shiba-inu", "corgi", "golden-retriever", "samoyed"] },
+      "additionalProperties": { "$ref": "#/$defs/breed" }
+    },
+    "coats": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z0-9-]+/[a-z0-9-]+$" },
+      "additionalProperties": { "$ref": "#/$defs/coat" }
+    },
+    "backgrounds": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "day": { "$ref": "#/$defs/image" },
+          "night": { "$ref": "#/$defs/image" },
+          "ambientAudioKey": { "$ref": "#/$defs/key" }
+        }
+      }
+    },
+    "hand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["day", "night", "pivot"],
+      "properties": {
+        "day": { "$ref": "#/$defs/nullableImage" },
+        "night": { "$ref": "#/$defs/nullableImage" },
+        "pivot": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y"],
+          "properties": {
+            "x": { "type": "number", "minimum": 0, "maximum": 1 },
+            "y": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "key": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9][A-Za-z0-9._/-]*$" },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "dimensions", "colorSpace"],
+      "properties": {
+        "key": { "$ref": "#/$defs/key" },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "colorSpace": { "enum": ["srgb", "linear"] }
+      }
+    },
+    "nullableImage": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/image" }] },
+    "views": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "back": { "$ref": "#/$defs/maps" },
+        "belly": { "$ref": "#/$defs/maps" }
+      }
+    },
+    "maps": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "albedo": { "$ref": "#/$defs/nullableImage" },
+        "normal": { "$ref": "#/$defs/nullableImage" },
+        "displacement": { "$ref": "#/$defs/nullableImage" },
+        "interactionMask": { "$ref": "#/$defs/nullableImage" },
+        "roughness": { "$ref": "#/$defs/nullableImage" }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "propertyNames": { "enum": ["purr", "coo", "pant", "sigh", "tail-tap", "fur-rub", "ambient"] },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "loop", "gain", "playbackRateRange"],
+          "properties": {
+            "key": { "$ref": "#/$defs/key" },
+            "loop": { "type": "boolean" },
+            "gain": { "type": "number", "minimum": 0, "maximum": 1 },
+            "playbackRateRange": {
+              "type": "array",
+              "prefixItems": [{ "type": "number", "exclusiveMinimum": 0 }, { "type": "number", "exclusiveMinimum": 0 }],
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
+        }
+      }
+    },
+    "breed": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "views": { "$ref": "#/$defs/views" }, "audio": { "$ref": "#/$defs/audio" } }
+    },
+    "coat": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "thumbnail": { "$ref": "#/$defs/image" }, "views": { "$ref": "#/$defs/views" } }
+    }
+  }
+}

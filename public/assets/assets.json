@@ -1,0 +1,14 @@
+{
+  "$schema": "./asset-manifest.schema.json",
+  "schemaVersion": 1,
+  "revision": "procedural-v1",
+  "baseUrl": "/assets",
+  "breeds": {},
+  "coats": {},
+  "backgrounds": {},
+  "hand": {
+    "day": null,
+    "night": null,
+    "pivot": { "x": 0.5, "y": 0.3 }
+  }
+}

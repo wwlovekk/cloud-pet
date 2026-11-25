@@ -1,0 +1,195 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Species {
+  cat
+  dog
+}
+
+enum PetView {
+  back
+  belly
+}
+
+enum LightingMode {
+  day
+  night
+}
+
+enum OwnerKind {
+  anonymous
+  account
+}
+
+enum TelemetryScope {
+  global
+  owner
+  breed
+}
+
+/// Breed anatomy, two-view rig, deformation weights and optional texture/audio assets.
+model SpeciesAndBreed {
+  id                   String   @id @default(cuid())
+  species              Species
+  slug                 String   @unique
+  name                 String
+  description          String?
+  skeletonParams       Json
+  deformationWeights   Json
+  proceduralAppearance Json
+  backAssetUrl         String?
+  bellyAssetUrl        String?
+  displacementMapUrl   String?
+  audioPack            Json
+  sortOrder            Int      @default(0)
+  enabled              Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  coatPatterns CoatPattern[]
+  profiles     UserPetProfile[]
+  telemetry    PettingTelemetry[]
+
+  // Composite reference prevents storing a cat profile with a dog breed.
+  @@unique([id, species])
+  @@index([species, enabled, sortOrder])
+}
+
+model CoatPattern {
+  id                String   @id @default(cuid())
+  breedId           String
+  slug              String
+  name              String
+  thumbnailUrl      String?
+  backTextureUrl    String?
+  bellyTextureUrl   String?
+  baseTone          String
+  proceduralPattern Json
+  // Separate albedo/normal/displacement/mask sets per view; see ViewAssetSet.
+  viewAssets        Json
+  sortOrder         Int      @default(0)
+  enabled           Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  breed    SpeciesAndBreed  @relation(fields: [breedId], references: [id], onDelete: Restrict)
+  profiles UserPetProfile[]
+
+  @@unique([breedId, slug])
+  // Composite reference prevents picking a coat from another breed.
+  @@unique([id, breedId])
+  @@index([breedId, enabled, sortOrder])
+}
+
+model BackgroundScene {
+  id                  String   @id @default(cuid())
+  slug                String   @unique
+  name                String
+  dayAssetUrl         String?
+  nightAssetUrl       String?
+  nightLightingParams Json
+  dayLightingParams   Json
+  ambientAudioUrl     String?
+  proceduralMaterial  Json
+  sortOrder           Int      @default(0)
+  enabled             Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  profiles UserPetProfile[]
+}
+
+/// Owner fields stay server-side. A public share code never grants edit permission.
+model UserPetProfile {
+  id                     String       @id @default(uuid())
+  ownerId                String
+  ownerKind              OwnerKind    @default(anonymous)
+  nickname               String       @default("团子")
+  species                Species
+  breedId                String
+  coatPatternId          String
+  backgroundSceneId      String?
+  size                   Float        @default(1.0)
+  chubbiness             Float        @default(0.5)
+  view                   PetView      @default(back)
+  lighting               LightingMode @default(day)
+  // Generated with cryptographic randomness in the API; public read only.
+  shareCode              String       @unique
+  isPublic               Boolean      @default(false)
+  totalPettingCount      BigInt       @default(0)
+  totalPettingDurationMs BigInt       @default(0)
+  affectionPoints        Int          @default(0)
+  intimacyLevel          Int          @default(0)
+  // Initialize from INITIAL_UNLOCK_STATE in the service; avoid provider-specific JSON defaults.
+  unlockState            Json
+  // Optimistic concurrency; PATCH must submit its expected version.
+  version                Int          @default(1)
+  lastPettedAt           DateTime?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  breed      SpeciesAndBreed    @relation(fields: [breedId, species], references: [id, species], onDelete: Restrict, onUpdate: NoAction)
+  coat       CoatPattern        @relation(fields: [coatPatternId, breedId], references: [id, breedId], onDelete: Restrict, onUpdate: NoAction)
+  background BackgroundScene?   @relation(fields: [backgroundSceneId], references: [id], onDelete: SetNull)
+  telemetry  PettingTelemetry[]
+
+  @@index([ownerId, ownerKind, updatedAt])
+  @@index([breedId])
+  @@index([coatPatternId, breedId])
+  @@index([backgroundSceneId])
+}
+
+/// One bounded batch, every 10 seconds or when petting ends. No pointer trajectories.
+model PettingTelemetry {
+  id                 String   @id @default(uuid())
+  ownerId            String
+  batchId            String
+  sessionId          String
+  sequence           Int
+  petId              String?
+  breedId            String
+  species            Species
+  view               PetView
+  durationMs         Int
+  strokeCount        Int
+  // Distances/speeds use pet-local coordinates, independent of viewport pixels.
+  distanceNormalized Float
+  averageSpeed       Float
+  regionCounts       Json
+  affectionEarned    Int      @default(0)
+  clientStartedAt    DateTime
+  clientEndedAt      DateTime
+  receivedAt         DateTime @default(now())
+
+  pet   UserPetProfile? @relation(fields: [petId], references: [id], onDelete: SetNull)
+  breed SpeciesAndBreed @relation(fields: [breedId, species], references: [id, species], onDelete: Restrict, onUpdate: NoAction)
+
+  // Insert + profile update + aggregate increments belong to one transaction.
+  @@unique([ownerId, batchId])
+  @@unique([ownerId, sessionId, sequence])
+  @@index([petId, receivedAt])
+  @@index([ownerId, receivedAt])
+  @@index([breedId, receivedAt])
+  @@index([receivedAt])
+}
+
+/// Extra aggregate table avoids scanning the event log for the footer/rankings.
+model PettingAggregate {
+  id                String         @id @default(cuid())
+  scope             TelemetryScope
+  // "all" for global, owner ID for owner, breed ID for breed. Never null.
+  subjectId         String
+  totalPettingCount BigInt         @default(0)
+  totalDurationMs   BigInt         @default(0)
+  totalBatchCount   BigInt         @default(0)
+  updatedAt         DateTime       @updatedAt
+
+  @@unique([scope, subjectId])
+  @@index([scope, totalPettingCount])
+}
