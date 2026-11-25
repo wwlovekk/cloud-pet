@@ -2,6 +2,16 @@
 
 猫咪抚摸网页。13 只猫各有独立的正面、背面和尾巴照片素材。支持日夜、体型、声音和全屏。
 
+## 网页实机演示
+
+按住滑动可以抚摸猫咪。摸到尾巴时，手势会变成轻握。向外拖能把尾巴拉直，松手后会卷回。演示还展示了翻身露肚皮和月光模式。点击动图即可打开网页。
+
+[![网页实机动图，依次展示抚摸、拖动尾巴、翻身和月光模式](docs/media/cloud-pet-live-demo.gif)](https://wwlovekk.github.io/cloud-pet/)
+
+## 项目效果图
+
+![撸撸猫效果图，展示日间抚摸、露肚皮和月光模式](docs/media/cloud-pet-showcase.jpg)
+
 ## 在线体验
 
 - [GitHub Pages 公开镜像](https://wwlovekk.github.io/cloud-pet/)
